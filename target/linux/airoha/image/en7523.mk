@@ -134,6 +134,15 @@ define Device/mitrastar_gpt-2742gx4x5v6
 endef
 TARGET_DEVICES += mitrastar_gpt-2742gx4x5v6
 
+define Device/skyworth_gn630v
+  $(Device/FitImage)
+  DEVICE_VENDOR := Skyworth
+  DEVICE_MODEL := GN630V
+  DEVICE_DTS := en7523-skyworth-gn630v
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7916-firmware wpad-mbedtls iw
+endef
+TARGET_DEVICES += skyworth_gn630v
+
 define Device/tplink_ex530v-v1
   $(Device/Uboot-FitImage)
   DEVICE_VENDOR := TP-Link
