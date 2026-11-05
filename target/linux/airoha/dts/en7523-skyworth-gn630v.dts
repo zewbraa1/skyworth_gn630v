@@ -285,6 +285,10 @@
 			nvmem-cells = <&mt7916_eeprom_factory>, <&macaddr_uboot 4>;
 			nvmem-cell-names = "eeprom", "mac-address";
 
+			/* Wi-Fi offload through WED and the NPU. */
+			airoha,npu = <&npu>;
+			airoha,eth = <&eth>;
+
 			/* MT7916 LED controller: with DBDC, mt76 muxes GPIO14 to the
 			 * 2.4 GHz LED and GPIO15 to the 5 GHz one whatever the pin
 			 * number (non-zero only matters without DBDC); the polarity
@@ -415,4 +419,13 @@
 &gsw_phy4_led0 {
 	color = <LED_COLOR_ID_GREEN>;
 	status = "okay";
+};
+
+/*
+ * Note: the NPU firmware copies RX frames to the host with GDMA channel 0
+ * and never unmasks it. The Linux GDMA driver masks every channel at probe,
+ * which hangs the NPU on its first frame, and nothing here uses the GDMA.
+ */
+&gdma {
+	status = "disabled";
 };
