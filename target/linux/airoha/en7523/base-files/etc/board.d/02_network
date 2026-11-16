@@ -39,6 +39,9 @@ setup_interfaces()
   mikrotik,e62iugs-2axd5axt)
     ucidef_set_interfaces_lan_wan "lan2 lan3 lan4 lan5" "wan sfp"
     ;;
+  skyworth,gn630v)
+    ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4" "pon0"
+    ;;
   tplink,ex530v-v1)
     ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4" "wan"
     ;;
