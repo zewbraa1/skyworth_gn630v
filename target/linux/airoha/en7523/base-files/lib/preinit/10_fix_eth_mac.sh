@@ -7,6 +7,7 @@ preinit_set_mac_address() {
   genexis,laxy |\
   genexis,pixly_r1 |\
   genexis,rodimus_r1 |\
+  skyworth,gn630v |\
   genexis,zephyr)
     ip link set dev eth0 address $(mtd_get_mac_ascii u-boot-env mac_addr)
     ;;
