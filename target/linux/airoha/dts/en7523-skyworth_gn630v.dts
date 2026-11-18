@@ -114,110 +114,54 @@
 
 &spi0 {
 	flash@0 {
-		compatible = "spi-nand";
 		reg = <0>;
+		compatible = "spi-nand";
 		spi-max-frequency = <50000000>;
+		spi-tx-bus-width = <1>;
+		spi-rx-bus-width = <2>;
 
 		partitions {
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			/*
-			 * Dual image. The U-Boot bootflag (ASCII '0'/'1' at 0xdfc0000)
-			 * selects bank A (0xc0000) or bank B (0x20c0000), 32 MiB each.
-			 * AlphaWRT runs from either bank: the stock web upgrade writes the
-			 * inactive one. Each bank:
-			 *   +0      HDR2 header + FIT (fdt@1/kernel@1/filesystem@1), 6 MiB
-			 *   +6 MiB  squashfs root, 16 MiB
-			 *   +22 MiB UBI overlay (rootfs_data), 10 MiB
-			 * The partition order is fixed so that the root= the vendor U-Boot
-			 * passes (mtdblock3 for A, mtdblock6 for B) is the right squashfs.
-			 * Software only writes the bank it runs from; the other bank keeps
-			 * stock as fallback. 0x6dc0000-0xddc0000 is unused (verified erased).
-			 */
 			partition@0 {
-				label = "bootloader";
-				reg = <0x00000000 0x00080000>;
+				label = "fip";
+				reg = <0x000000 0x100000>;
 				read-only;
+			};
 
-				/* U-Boot env at 0x7c000 (16 KiB, CRC32 + key=value). Never
-				 * write it: it shares an erase block with U-Boot code. */
-				nvmem-layout {
-					compatible = "fixed-layout";
-					#address-cells = <1>;
-					#size-cells = <1>;
+			partition@100000 {
+				label = "ubi";
+				compatible = "linux,ubi";
+				reg = <0x100000 0x0dcc0000>;
 
-					/* value of "ethaddr=" in the env, "xx:xx:xx:xx:xx:xx" */
-					macaddr_uboot: macaddr@7c34e {
-						compatible = "mac-base";
-						reg = <0x7c34e 0x11>;
-						#nvmem-cell-cells = <1>;
+				volumes {
+					ubi-volume-ubootenv {
+						volname = "ubootenv";
+						nvmem-layout {
+							compatible = "u-boot,env-redundant-bool";
+						};
+					};
+
+					ubi-volume-ubootenv2 {
+						volname = "ubootenv2";
+						nvmem-layout {
+							compatible = "u-boot,env-redundant-bool";
+						};
+					};
+
+					firmware: ubi-volume-firmware {
+						volname = "fit";
+						compatible = "denx,uimage";
 					};
 				};
 			};
 
-			partition@80000 {
-				label = "romfile";
-				reg = <0x00080000 0x00040000>;
-				read-only;
-			};
-
-			/* bank A (stock "tclinux") */
-			partition@c0000 {
-				label = "kernel";
-				reg = <0x000c0000 0x00600000>;
-			};
-
-			partition@6c0000 {
-				label = "openwrt_rootfs";	/* mtd3 */
-				reg = <0x006c0000 0x01000000>;
-			};
-
-			partition@16c0000 {
-				/* not "ubi"/"data", so no UBI auto-attach: preinit attaches
-				 * the data partition of the bank it booted from */
-				label = "openwrt_data";
-				reg = <0x016c0000 0x00a00000>;
-			};
-
-			/* bank B (stock "tclinux_slave") */
-			partition@20c0000 {
-				label = "kernel_b";
-				reg = <0x020c0000 0x00600000>;
-			};
-
-			partition@26c0000 {
-				label = "openwrt_rootfs_b";	/* mtd6 */
-				reg = <0x026c0000 0x01000000>;
-			};
-
-			partition@36c0000 {
-				label = "openwrt_data_b";
-				reg = <0x036c0000 0x00a00000>;
-			};
-
-			partition@40c0000 {
-				label = "config";
-				reg = <0x040c0000 0x00800000>;
-				read-only;
-			};
-
-			partition@48c0000 {
-				label = "ubifs";
-				reg = <0x048c0000 0x02000000>;
-				read-only;
-			};
-
-			partition@68c0000 {
-				label = "teapot";
-				reg = <0x068c0000 0x00500000>;
-				read-only;
-			};
-
+			/* Protected raw factory calibration & MACs */
 			partition@ddc0000 {
 				label = "reservearea";
-				reg = <0x0ddc0000 0x00200000>;
+				reg = <0x0ddc0000 0x00240000>;
 				read-only;
 
 				nvmem-layout {
@@ -225,30 +169,20 @@
 					#address-cells = <1>;
 					#size-cells = <1>;
 
-					/* MT7916 calibration, as stock ("5G" at 0x4c000) */
-					mt7916_eeprom_factory: eeprom@4c000 {
-						reg = <0x4c000 0x1000>;
+					macaddr: macaddr@0 {
+						compatible = "mac-base";
+						reg = <0x0 0x6>;
+						#nvmem-cell-cells = <1>;
 					};
 
-					/* EN7571 laser calibration (BOB): magic 0x07050701
-					 * at +0x94 */
-					en7571_bob: bob@140477 {
-						reg = <0x140477 0x200>;
+					eeprom: eeprom@40000 {
+						reg = <0x40000 0x1000>;
+					};
+
+					en7571_bob: en7571_bob@c0000 {
+						reg = <0xc0000 0xff>;
 					};
 				};
-			};
-
-			/* the stock reservearea continues here: its 128 KiB block
-			 * holding only the U-Boot bootflag (see alphawrt-bootbank) */
-			partition@dfc0000 {
-				label = "bootflag";
-				reg = <0x0dfc0000 0x00020000>;
-			};
-
-			partition@dfe0000 {
-				label = "reservearea_tail";
-				reg = <0x0dfe0000 0x00020000>;
-				read-only;
 			};
 		};
 	};
