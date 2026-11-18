@@ -149,16 +149,19 @@ endef
 define Build/ecnt-factory
 	$(STAGING_DIR_HOST)/bin/python3 -c 'import os, struct, subprocess, sys, zlib; \
 		kern_hdr2, dtb_path, root_path, mkimage, out_path = sys.argv[1:]; \
-		k_gz = out_path + ".k.gz"; \
-		open(k_gz, "wb").write(open(kern_hdr2, "rb").read()[0x100:]); \
+		raw_fit = open(kern_hdr2, "rb").read()[0x100:]; \
+		gz_start = raw_fit.find(b"\x1f\x8b\x08"); \
+		k_gz = out_path + ".gz"; \
+		open(k_gz, "wb").write(raw_fit[gz_start:]); \
 		its_path = out_path + ".its"; \
 		itb_path = out_path + ".itb"; \
+		pad_file = out_path + ".pad"; \
 		def build_itb(pad_bytes): \
-			pad_file = out_path + ".pad"; \
 			open(pad_file, "wb").write(b"\xff" * pad_bytes); \
+			pad_node = f"pad@1 {{ description = \"Padding\"; data = /incbin/(\"{pad_file}\"); type = \"firmware\"; compression = \"none\"; }};" if pad_bytes > 0 else ""; \
 			its = f"""/dts-v1/; \
 / {{ \
-	description = "ECONET Linux fitImage"; \
+	description = "Kernel image with single Linux kernel, rootfs and FDT blob"; \
 	#address-cells = <1>; \
 	images {{ \
 		fdt@1 {{ \
@@ -170,27 +173,21 @@ define Build/ecnt-factory
 			hash@1 {{ algo = "sha1"; }}; \
 		}}; \
 		kernel@1 {{ \
-			description = "ARM OpenWrt Linux"; \
-			data = /incbin/("{kern_hdr2}"); \
+			description = "ECONET Linux kernel"; \
+			data = /incbin/("{k_gz}"); \
 			type = "kernel"; \
 			arch = "arm"; \
 			os = "linux"; \
-			compression = "none"; \
+			compression = "gzip"; \
 			load = <0x80208000>; \
 			entry = <0x80208000>; \
 			hash@1 {{ algo = "sha1"; }}; \
 		}}; \
-		pad@1 {{ \
-			description = "Alignment Padding"; \
-			data = /incbin/("{pad_file}"); \
-			type = "firmware"; \
-			compression = "none"; \
-		}}; \
+		{pad_node} \
 		filesystem@1 {{ \
-			description = "OpenWrt SquashFS rootfs"; \
+			description = "ECONET Root File System"; \
 			data = /incbin/("{root_path}"); \
 			type = "filesystem"; \
-			arch = "arm"; \
 			compression = "none"; \
 			hash@1 {{ algo = "sha1"; }}; \
 		}}; \
@@ -198,7 +195,7 @@ define Build/ecnt-factory
 	configurations {{ \
 		default = "conf@1"; \
 		conf@1 {{ \
-			description = "Boot Linux kernel"; \
+			description = "Boot Linux kernel with FDT blob"; \
 			kernel = "kernel@1"; \
 			fdt = "fdt@1"; \
 		}}; \
@@ -216,7 +213,7 @@ define Build/ecnt-factory
 		hdr = struct.pack("<4sIII32s32sIII32s132x", \
 			b"HDR2", 0x100, len(itb) + 0x100, crc, \
 			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
-			os.path.getsize(kern_hdr2), len(root), 0, b"EN7523,GN630\n"); \
+			os.path.getsize(k_gz), len(root), 0, b"EN7523,GN630\n"); \
 		open(out_path, "wb").write(hdr + itb)' \
 		$(IMAGE_KERNEL) $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb $(IMAGE_ROOTFS) $(STAGING_DIR_HOST)/bin/mkimage $@
 endef
@@ -225,8 +222,7 @@ define Device/skyworth_gn630v
   $(Device/FitImage)
   DEVICE_VENDOR := Skyworth
   DEVICE_MODEL := GN630V
-  DEVICE_DTS := en7523-skyworth_gn630v
-  KERNEL := kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | ecnt-hdr2
+  KERNEL := kernel-bin | gzip | save-raw-gz | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | ecnt-hdr2
   IMAGES := sysupgrade.bin tclinux-factory.bin
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
   IMAGE/tclinux-factory.bin := ecnt-factory
