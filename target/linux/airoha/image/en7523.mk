@@ -150,9 +150,11 @@ define Build/ecnt-factory
 	$(STAGING_DIR_HOST)/bin/python3 -c 'import os, struct, subprocess, sys, zlib; \
 		kern_hdr2, dtb_path, root_path, mkimage, out_path = sys.argv[1:]; \
 		raw_fit = open(kern_hdr2, "rb").read()[0x100:]; \
-		gz_start = raw_fit.find(b"\x1f\x8b\x08"); \
+		gz_buf = raw_fit[raw_fit.find(b"\x1f\x8b\x08"):]; \
+		d = zlib.decompressobj(16 + zlib.MAX_WBITS); d.decompress(gz_buf); \
+		k_gz_bytes = gz_buf[:len(gz_buf) - len(d.unused_data)]; \
 		k_gz = out_path + ".gz"; \
-		open(k_gz, "wb").write(raw_fit[gz_start:]); \
+		open(k_gz, "wb").write(k_gz_bytes); \
 		its_path = out_path + ".its"; \
 		itb_path = out_path + ".itb"; \
 		pad_file = out_path + ".pad"; \
@@ -161,7 +163,7 @@ define Build/ecnt-factory
 			pad_node = f"pad@1 {{ description = \"Padding\"; data = /incbin/(\"{pad_file}\"); type = \"firmware\"; compression = \"none\"; }};" if pad_bytes > 0 else ""; \
 			its = f"""/dts-v1/; \
 / {{ \
-	description = "Kernel image with single Linux kernel, rootfs and FDT blob"; \
+	description = "Kernel image with single Linux kernel, rootfs and FDT blob for spoofing Skyworths signature check"; \
 	#address-cells = <1>; \
 	images {{ \
 		fdt@1 {{ \
@@ -213,7 +215,7 @@ define Build/ecnt-factory
 		hdr = struct.pack("<4sIII32s32sIII32s132x", \
 			b"HDR2", 0x100, len(itb) + 0x100, crc, \
 			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
-			os.path.getsize(k_gz), len(root), 0, b"EN7523,GN630\n"); \
+			len(k_gz_bytes), len(root), 0, b"EN7523,GN630\n"); \
 		open(out_path, "wb").write(hdr + itb)' \
 		$(IMAGE_KERNEL) $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb $(IMAGE_ROOTFS) $(STAGING_DIR_HOST)/bin/mkimage $@
 endef
