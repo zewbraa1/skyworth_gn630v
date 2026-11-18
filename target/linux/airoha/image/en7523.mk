@@ -134,15 +134,49 @@ define Device/mitrastar_gpt-2742gx4x5v6
 endef
 TARGET_DEVICES += mitrastar_gpt-2742gx4x5v6
 
+define Build/ecnt-hdr2
+	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
+		p = sys.argv[1]; \
+		data = open(p, "rb").read(); \
+		crc = zlib.crc32(data) & 0xffffffff; \
+		hdr = struct.pack("<4sIII32s32sIII32s132x", \
+			b"HDR2", 0x100, len(data) + 0x100, crc, \
+			b"ARM OpenWrt\n", b"Skyworth GN630V Image\n", \
+			len(data), 0, 0, b"EN7523,GN630\n"); \
+		open(p, "wb").write(hdr + data)' $@
+endef
+
+define Build/ecnt-factory
+	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
+		kern_path, root_path, out_path = sys.argv[1:]; \
+		kern = open(kern_path, "rb").read()[0x100:]; \
+		root = open(root_path, "rb").read(); \
+		pad_len = 0x600000 - 0x100 - len(kern); \
+		payload = kern + (b"\xff" * pad_len) + root; \
+		crc = zlib.crc32(payload) & 0xffffffff; \
+		hdr = struct.pack("<4sIII32s32sIII32s132x", \
+			b"HDR2", 0x100, len(payload) + 0x100, crc, \
+			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
+			len(kern), len(root), 0, b"EN7523,GN630\n"); \
+		open(out_path, "wb").write(hdr + payload)' $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@
+endef
+
 define Device/skyworth_gn630v
   $(Device/FitImage)
   DEVICE_VENDOR := Skyworth
   DEVICE_MODEL := GN630V
-  DEVICE_DTS := en7523-skyworth-gn630v
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7916-firmware wpad-mbedtls iw \
-                     airoha-en7523-kite-npu-firmware
+  DEVICE_DTS := en7523-skyworth_gn630v
+  KERNEL := kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | ecnt-hdr2
+  IMAGES := sysupgrade.bin tclinux-factory.bin
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  IMAGE/tclinux-factory.bin := ecnt-factory
+  DEVICE_PACKAGES += kmod-usb-ohci kmod-usb3 \
+                     hostapd-mbedtls wpa-supplicant-mbedtls \
+                     kmod-mt7915e kmod-mt7916-firmware \
+                     fit-check-image
 endef
 TARGET_DEVICES += skyworth_gn630v
+
 
 define Device/tplink_ex530v-v1
   $(Device/Uboot-FitImage)
