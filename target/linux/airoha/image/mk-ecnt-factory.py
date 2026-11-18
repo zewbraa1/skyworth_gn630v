@@ -1,4 +1,3 @@
-cat << 'EOF' > ~/skyworth_gn630v/target/linux/airoha/image/mk-ecnt-factory.py
 #!/usr/bin/env python3
 import os
 import struct
@@ -100,5 +99,3 @@ hdr = struct.pack(
     b"EN7523,GN630\n",
 )
 open(out_path, "wb").write(hdr + itb)
-EOF
-chmod +x ~/skyworth_gn630v/target/linux/airoha/image/mk-ecnt-factory.py
