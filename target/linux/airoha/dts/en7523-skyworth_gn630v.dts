@@ -112,13 +112,26 @@
 	};
 };
 
+/*
+Stock mapping:
+
+0x00000000-0x00080000 : "bootloader"
+0x00080000-0x000c0000 : "romfile"
+0x000c0000-0x003425ab : "kernel"
+0x003426a4-0x013626a4 : "rootfs"
+0x000c0000-0x020c0000 : "tclinux"
+0x020c0000-0x023425ab : "kernel_slave"
+0x023426a4-0x033626a4 : "rootfs_slave"
+0x020c0000-0x040c0000 : "tclinux_slave"
+0x040c0000-0x048c0000 : "config"
+0x048c0000-0x068c0000 : "ubifs"
+0x0ddc0000-0x0e000000 : "reservearea"
+*/
 &spi0 {
 	flash@0 {
-		reg = <0>;
 		compatible = "spi-nand";
+		reg = <0>;
 		spi-max-frequency = <50000000>;
-		spi-tx-bus-width = <1>;
-		spi-rx-bus-width = <2>;
 
 		partitions {
 			compatible = "fixed-partitions";
@@ -127,21 +140,21 @@
 
 			partition@0 {
 				label = "u-boot";
-				reg = <0x00000000 0x00100000>;
+				reg = <0x000000 0x100000>;
 				read-only;
 			};
 
 			partition@100000 {
 				label = "ubi";
 				compatible = "linux,ubi";
-				/* Capped at 0x0dcc0000 to safely stop right before 0x0ddc0000 (reservearea) */
-				reg = <0x00100000 0x0dcc0000>;
+				reg = <0x100000 0x000000>;
 
 				volumes {
 					ubi-volume-ubootenv {
 						volname = "ubootenv";
 						nvmem-layout {
 							compatible = "u-boot,env-redundant-bool";
+							env-size = <0x4000>;
 						};
 					};
 
@@ -149,6 +162,11 @@
 						volname = "ubootenv2";
 						nvmem-layout {
 							compatible = "u-boot,env-redundant-bool";
+							env-size = <0x4000>;
+
+							macaddr: ethaddr {
+								#nvmem-cell-cells = <1>;
+							};
 						};
 					};
 
@@ -161,14 +179,15 @@
 							#address-cells = <1>;
 							#size-cells = <1>;
 
-							macaddr: macaddr@4f100 {
-								#nvmem-cell-cells = <1>;
-								compatible = "mac-base";
-								reg = <0x4f100 0x6>;
+							/* MT7916 calibration, as stock ("5G" at 0x4c000) */
+							mt7916_eeprom_factory: eeprom@4c000 {
+								reg = <0x4c000 0x1000>;
 							};
-
-							eeprom: eeprom@80000 {
-								reg = <0x80000 0x1000>;
+		
+							/* EN7571 laser calibration (BOB): magic 0x07050701
+							 * at +0x94 */
+							en7571_bob: bob@140477 {
+								reg = <0x140477 0x200>;
 							};
 						};
 					};
@@ -178,12 +197,6 @@
 						compatible = "denx,uimage";
 					};
 				};
-			};
-
-			partition@ddc0000 {
-				label = "reservearea";
-				reg = <0x0ddc0000 0x00240000>;
-				read-only;
 			};
 		};
 	};
