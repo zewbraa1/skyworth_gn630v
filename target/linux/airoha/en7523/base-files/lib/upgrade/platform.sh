@@ -1,5 +1,5 @@
 REQUIRE_IMAGE_METADATA=1
-RAMFS_COPY_BIN='fitblk fit_check_sign yafut'
+RAMFS_COPY_BIN='fitblk fit_check_sign yafut ubidetach ubiformat ubiattach ubimkvol'
 
 ROUTERBOOT_KERNEL_MAX_SIZE=$((7 * 1024 * 1024))
 ROUTERBOOT_KERNEL_MTD_SIZE=$((8 * 1024 * 1024))
@@ -70,6 +70,25 @@ platform_do_upgrade_mikrotik_nand() {
 	nand_do_upgrade "$image"
 }
 
+platform_do_upgrade_skyworth_gn630v() {
+	local tar_file="$1"
+	local board_dir="$(tar tf "$tar_file" | grep -m 1 '^sysupgrade-.*/$')"
+	board_dir="${board_dir%/}"
+
+	[ -n "$board_dir" ] || {
+		echo "Cannot find sysupgrade directory"
+		return 1
+	}
+
+	tar xOf "$tar_file" "${board_dir}/kernel" | mtd write - kernel || return 1
+	tar xOf "$tar_file" "${board_dir}/root" | mtd write - openwrt_rootfs || return 1
+
+	ubidetach -p /dev/mtd4 2>/dev/null || true
+	ubiformat /dev/mtd4 -y || return 1
+	ubiattach -p /dev/mtd4 || return 1
+	ubimkvol /dev/ubi0 -N rootfs_data -m || return 1
+}
+
 platform_do_upgrade() {
   local board=$(board_name)
 
@@ -90,6 +109,9 @@ platform_do_upgrade() {
   mikrotik,e60iugs |\
   mikrotik,e62iugs-2axd5axt)
     platform_do_upgrade_mikrotik_nand "$1"
+	;;
+    skyworth,gn630v)
+    platform_do_upgrade_skyworth_gn630v "$1"
     ;;
   *)
     nand_do_upgrade "$1"
