@@ -136,7 +136,7 @@ TARGET_DEVICES += mitrastar_gpt-2742gx4x5v6
 
 define Build/ecnt-hdr2
 	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
-		p = sys.argv; \
+		p = sys.argv[1]; \
 		data = open(p, "rb").read(); \
 		crc = zlib.crc32(data) & 0xffffffff; \
 		hdr = struct.pack("<4sIII32s32sIII32s132x", \
