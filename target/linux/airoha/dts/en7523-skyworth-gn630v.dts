@@ -170,14 +170,14 @@
 			};
 
 			partition@6c0000 {
-				label = "alphawrt_rootfs";	/* mtd3 */
+				label = "openwrt_rootfs";	/* mtd3 */
 				reg = <0x006c0000 0x01000000>;
 			};
 
 			partition@16c0000 {
 				/* not "ubi"/"data", so no UBI auto-attach: preinit attaches
 				 * the data partition of the bank it booted from */
-				label = "alphawrt_data";
+				label = "openwrt_data";
 				reg = <0x016c0000 0x00a00000>;
 			};
 
@@ -188,12 +188,12 @@
 			};
 
 			partition@26c0000 {
-				label = "alphawrt_rootfs_b";	/* mtd6 */
+				label = "openwrt_rootfs_b";	/* mtd6 */
 				reg = <0x026c0000 0x01000000>;
 			};
 
 			partition@36c0000 {
-				label = "alphawrt_data_b";
+				label = "openwrt_data_b";
 				reg = <0x036c0000 0x00a00000>;
 			};
 
