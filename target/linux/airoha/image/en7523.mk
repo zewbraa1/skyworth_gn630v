@@ -138,7 +138,9 @@ define Device/skyworth_gn630v
   $(Device/FitImage)
   DEVICE_VENDOR := Skyworth
   DEVICE_MODEL := GN630V
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7916-firmware wpad-mbedtls iw
+   DEVICE_PACKAGES += kmod-usb-ohci kmod-usb3 \
+                     hostapd-mbedtls wpa-supplicant-mbedtls \
+                     kmod-mt7915e kmod-mt7916-firmware
 endef
 TARGET_DEVICES += skyworth_gn630v
 
