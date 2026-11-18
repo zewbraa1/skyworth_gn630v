@@ -147,18 +147,78 @@ define Build/ecnt-hdr2
 endef
 
 define Build/ecnt-factory
-	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
-		kern_path, root_path, out_path = sys.argv[1:]; \
-		kern = open(kern_path, "rb").read()[0x100:]; \
+	$(STAGING_DIR_HOST)/bin/python3 -c 'import os, struct, subprocess, sys, zlib; \
+		kern_hdr2, dtb_path, root_path, mkimage, out_path = sys.argv[1:]; \
+		k_gz = out_path + ".k.gz"; \
+		open(k_gz, "wb").write(open(kern_hdr2, "rb").read()[0x100:]); \
+		its_path = out_path + ".its"; \
+		itb_path = out_path + ".itb"; \
+		def build_itb(pad_bytes): \
+			pad_file = out_path + ".pad"; \
+			open(pad_file, "wb").write(b"\xff" * pad_bytes); \
+			its = f"""/dts-v1/; \
+/ {{ \
+	description = "ECONET Linux fitImage"; \
+	#address-cells = <1>; \
+	images {{ \
+		fdt@1 {{ \
+			description = "ECONET Flattened Device Tree blob"; \
+			data = /incbin/("{dtb_path}"); \
+			type = "flat_dt"; \
+			arch = "arm"; \
+			compression = "none"; \
+			hash@1 {{ algo = "sha1"; }}; \
+		}}; \
+		kernel@1 {{ \
+			description = "ARM OpenWrt Linux"; \
+			data = /incbin/("{kern_hdr2}"); \
+			type = "kernel"; \
+			arch = "arm"; \
+			os = "linux"; \
+			compression = "none"; \
+			load = <0x80208000>; \
+			entry = <0x80208000>; \
+			hash@1 {{ algo = "sha1"; }}; \
+		}}; \
+		pad@1 {{ \
+			description = "Alignment Padding"; \
+			data = /incbin/("{pad_file}"); \
+			type = "firmware"; \
+			compression = "none"; \
+		}}; \
+		filesystem@1 {{ \
+			description = "OpenWrt SquashFS rootfs"; \
+			data = /incbin/("{root_path}"); \
+			type = "filesystem"; \
+			arch = "arm"; \
+			compression = "none"; \
+			hash@1 {{ algo = "sha1"; }}; \
+		}}; \
+	}}; \
+	configurations {{ \
+		default = "conf@1"; \
+		conf@1 {{ \
+			description = "Boot Linux kernel"; \
+			kernel = "kernel@1"; \
+			fdt = "fdt@1"; \
+		}}; \
+	}}; \
+}};"""; \
+			open(its_path, "w").write(its); \
+			subprocess.run([mkimage, "-f", its_path, itb_path], check=True); \
+			return open(itb_path, "rb").read(); \
+		itb0 = build_itb(0); \
 		root = open(root_path, "rb").read(); \
-		pad_len = 0x600000 - 0x100 - len(kern); \
-		payload = kern + (b"\xff" * pad_len) + root; \
-		crc = zlib.crc32(payload) & 0xffffffff; \
+		fs_off = itb0.find(root[:64]); \
+		pad_needed = 0x600000 - (0x100 + fs_off); \
+		itb = build_itb(pad_needed); \
+		crc = zlib.crc32(itb) & 0xffffffff; \
 		hdr = struct.pack("<4sIII32s32sIII32s132x", \
-			b"HDR2", 0x100, len(payload) + 0x100, crc, \
+			b"HDR2", 0x100, len(itb) + 0x100, crc, \
 			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
-			len(kern), len(root), 0, b"EN7523,GN630\n"); \
-		open(out_path, "wb").write(hdr + payload)' $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@
+			os.path.getsize(kern_hdr2), len(root), 0, b"EN7523,GN630\n"); \
+		open(out_path, "wb").write(hdr + itb)' \
+		$(IMAGE_KERNEL) $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb $(IMAGE_ROOTFS) $(STAGING_DIR_HOST)/bin/mkimage $@
 endef
 
 define Device/skyworth_gn630v
