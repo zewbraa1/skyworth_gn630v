@@ -134,11 +134,25 @@ define Device/mitrastar_gpt-2742gx4x5v6
 endef
 TARGET_DEVICES += mitrastar_gpt-2742gx4x5v6
 
+define Build/ecnt-hdr2
+	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
+		p = sys.argv; \
+		data = open(p, "rb").read(); \
+		crc = zlib.crc32(data) & 0xffffffff; \
+		hdr = struct.pack("<4sIII32s32sIII32s132x", \
+			b"HDR2", 0x100, len(data) + 0x100, crc, \
+			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
+			len(data), 0, 0, b"EN7523,GN630\n"); \
+		open(p, "wb").write(hdr + data)' $@
+endef
+
 define Device/skyworth_gn630v
   $(Device/FitImage)
   DEVICE_VENDOR := Skyworth
   DEVICE_MODEL := GN630V
-   DEVICE_PACKAGES += kmod-usb-ohci kmod-usb3 \
+  KERNEL := kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | ecnt-hdr2
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  DEVICE_PACKAGES += kmod-usb-ohci kmod-usb3 \
                      hostapd-mbedtls wpa-supplicant-mbedtls \
                      kmod-mt7915e kmod-mt7916-firmware
 endef
