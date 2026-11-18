@@ -74,6 +74,12 @@ def build_itb(pad_bytes):
     }};
 }};
 '''
+        open(its_path, "w").write(its)
+    env = os.environ.copy()
+    env["PATH"] = f"{os.path.dirname(mkimage)}:{os.path.dirname(dtb_path)}/linux-6.18.55/scripts/dtc:" + env.get("PATH", "")
+    subprocess.run([mkimage, "-f", its_path, itb_path], check=True, env=env)
+    return open(itb_path, "rb").read()
+
     open(its_path, "w").write(its)
     subprocess.run([mkimage, "-f", its_path, itb_path], check=True)
     return open(itb_path, "rb").read()
