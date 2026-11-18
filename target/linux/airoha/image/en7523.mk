@@ -136,12 +136,12 @@ TARGET_DEVICES += mitrastar_gpt-2742gx4x5v6
 
 define Build/ecnt-hdr2
 	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
-		p = sys.argv[1]; \
+		p = sys.argv; \
 		data = open(p, "rb").read(); \
-		crc = zlib.crc32(data) & 0xffffffff; \
+		crc = (~zlib.crc32(data)) & 0xffffffff; \
 		hdr = struct.pack("<4sIII32s32sIII32s132x", \
 			b"HDR2", 0x100, len(data) + 0x100, crc, \
-			b"ARM OpenWrt\n", b"Skyworth GN630V Image\n", \
+			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
 			len(data), 0, 0, b"EN7523,GN630\n"); \
 		open(p, "wb").write(hdr + data)' $@
 endef
@@ -163,7 +163,7 @@ define Build/ecnt-factory
 			pad_node = f"pad@1 {{ description = \"Padding\"; data = /incbin/(\"{pad_file}\"); type = \"firmware\"; compression = \"none\"; }};" if pad_bytes > 0 else ""; \
 			its = f"""/dts-v1/; \
 / {{ \
-	description = "Kernel image with single Linux kernel, rootfs and FDT blob for spoofing Skyworths signature check"; \
+	description = "Kernel image with single Linux kernel, rootfs and FDT blob for Skyworth"; \
 	#address-cells = <1>; \
 	images {{ \
 		fdt@1 {{ \
@@ -211,7 +211,7 @@ define Build/ecnt-factory
 		fs_off = itb0.find(root[:64]); \
 		pad_needed = 0x600000 - (0x100 + fs_off); \
 		itb = build_itb(pad_needed); \
-		crc = zlib.crc32(itb) & 0xffffffff; \
+		crc = (~zlib.crc32(itb)) & 0xffffffff; \
 		hdr = struct.pack("<4sIII32s32sIII32s132x", \
 			b"HDR2", 0x100, len(itb) + 0x100, crc, \
 			b"7.3.267.700_v013\n", b"V1.0.0.1\n", \
