@@ -146,12 +146,29 @@ define Build/ecnt-hdr2
 		open(p, "wb").write(hdr + data)' $@
 endef
 
+define Build/ecnt-factory
+	$(STAGING_DIR_HOST)/bin/python3 -c 'import struct, sys, zlib; \
+		kern_path, root_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]; \
+		kern = open(kern_path, "rb").read()[0x100:]; \
+		root = open(root_path, "rb").read(); \
+		pad_len = 0x600000 - 0x100 - len(kern); \
+		payload = kern + (b"\xff" * pad_len) + root; \
+		crc = zlib.crc32(payload) & 0xffffffff; \
+		hdr = struct.pack("<4sIII32s32sIII32s132x", \
+			b"HDR2", 0x100, len(payload) + 0x100, crc, \
+			b"ARM OpenWrt\n", b"Skyworth GN630V Image\n", \
+			len(kern), len(root), 0, b"EN7523,GN630\n"); \
+		open(out_path, "wb").write(hdr + payload)' $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@
+endef
+
 define Device/skyworth_gn630v
   $(Device/FitImage)
   DEVICE_VENDOR := Skyworth
   DEVICE_MODEL := GN630V
   KERNEL := kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | ecnt-hdr2
+  IMAGES := sysupgrade.bin factory.bin
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  IMAGE/factory.bin := ecnt-factory
   DEVICE_PACKAGES += kmod-usb-ohci kmod-usb3 \
                      hostapd-mbedtls wpa-supplicant-mbedtls \
                      kmod-mt7915e kmod-mt7916-firmware
